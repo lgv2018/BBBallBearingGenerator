@@ -12,10 +12,10 @@ _units = "mm"
 h = 10
 di = 9
 do = 30
-dbb = 7
+dbb = 6.2
 dbb_extract = 2
 wgap = 1.5
-
+overhang_angle = 45
 
 def run(context):
     ui = None
@@ -107,17 +107,27 @@ def run(context):
         circles = sketch3.sketchCurves.sketchCircles
         circle6 = circles.addByCenterRadius(adsk.core.Point3D.create(0, dm/2, 0), dbb/2)
 
+        lines = sketch3.sketchCurves.sketchLines
+        x1 = dbb/2 * math.cos(    overhang_angle  * math.pi / 180)
+        y1 = dbb/2 * math.sin(    overhang_angle  * math.pi / 180)
+        y2 = dbb/2 / math.cos((90-overhang_angle) * math.pi / 180)
+        overhang_line1 = lines.addByTwoPoints(adsk.core.Point3D.create( y2, dm/2, 0), adsk.core.Point3D.create( y1, dm/2+x1, 0))
+        overhang_line2 = lines.addByTwoPoints(adsk.core.Point3D.create( y2, dm/2, 0), adsk.core.Point3D.create( y1, dm/2-x1, 0))
+        overhang_line3 = lines.addByTwoPoints(adsk.core.Point3D.create(-y2, dm/2, 0), adsk.core.Point3D.create(-y1, dm/2+x1, 0))
+        overhang_line4 = lines.addByTwoPoints(adsk.core.Point3D.create(-y2, dm/2, 0), adsk.core.Point3D.create(-y1, dm/2-x1, 0))
+
         # STEP 6: Revolute (cut) with previous circles
         # Draw a line to use as the axis of revolution.
         lines = sketch3.sketchCurves.sketchLines
         axisLine = lines.addByTwoPoints(adsk.core.Point3D.create(-h/2, 0, 0), adsk.core.Point3D.create(h/2, 0, 0))
         axisLine.isConstruction = True
 
-        prof3 = sketch3.profiles.item(0)
-        revInput = revolves.createInput(prof3, axisLine, adsk.fusion.FeatureOperations.CutFeatureOperation)
-        angle = adsk.core.ValueInput.createByReal(2*math.pi)
-        revInput.setAngleExtent(False, angle)
-        revolute1 = revolves.add(revInput)
+        for i in [0,1,2]:
+            prof3 = sketch3.profiles.item(i)
+            revInput = revolves.createInput(prof3, axisLine, adsk.fusion.FeatureOperations.CutFeatureOperation)
+            angle = adsk.core.ValueInput.createByReal(2*math.pi)
+            revInput.setAngleExtent(False, angle)
+            revolute1 = revolves.add(revInput)
 
         # STEP 7: Draw insertion circle
         sketch4 = sketches.add(xyPlane)
@@ -136,7 +146,21 @@ def run(context):
         extInput4.setOneSideExtent(adsk.fusion.ThroughAllExtentDefinition.create(), adsk.fusion.ExtentDirections.PositiveExtentDirection)
         extrude4 = extrudes.add(extInput4)
 
-
+        # STEP 9: Join 2 bodies
+        sketch5 = sketches.add(xyPlane)
+        lines = sketch5.sketchCurves.sketchLines
+        lines.addThreePointRectangle(
+            adsk.core.Point3D.create(0.00*scale, dm/2-dbb_extract/2, 0),
+            adsk.core.Point3D.create(0.00*scale, dm/2+dbb_extract/2, 0),
+            adsk.core.Point3D.create(0.01*scale, dm/2+dbb_extract/2, 0)
+        )
+        prof6 = sketch5.profiles.item(0)
+        extInput5 = extrudes.createInput(prof6, adsk.fusion.FeatureOperations.JoinFeatureOperation)
+        extInput5.setTwoSidesExtent(
+            adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(-h/2             )),
+            adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal( h/2 - 0.01*scale))
+        )
+        extrude5 = extrudes.add(extInput5)
 
     except:
         if ui:
